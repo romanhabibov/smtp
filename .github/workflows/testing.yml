@@ -8,6 +8,45 @@ on: [push, pull_request]
 #       setup-tarantool to use it here.
 
 jobs:
+  testing_rpm_deb_linux:
+    # We want to run on external PRs, but not on our own internal
+    # PRs as they'll be run by the push to the branch.
+    #
+    # The main trick is described here:
+    # https://github.com/Dart-Code/Dart-Code/pull/2375
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+
+    strategy:
+      fail-fast: false
+      matrix:
+        tarantool:
+          - release/1.10.10
+    env:
+      # Prevent packages like tzdata from asking configuration
+      # parameters interactively.
+      # See https://github.com/packpack/packpack/issues/7
+      DEBIAN_FRONTEND: noninteractive
+    runs-on: ubuntu-latest
+    steps:
+      container:
+        image: ubuntu:20.04
+
+      - name: Install packpack
+        uses: actions/checkout@v2
+        run: |
+          mkdir ~/tools && cd ~/tools
+          git clone https://github.com/packpack/packpack
+          cd packpack
+          grep 'OS=\|DIST=' .travis.yml
+
+      - name: Pack
+        uses: actions/checkout@v1
+        run: |
+          OS=ubuntu DIST=bionic ~/tools/packpack/packpack
+          cd build
+          ls
+
+
   testing_linux:
     # We want to run on external PRs, but not on our own internal
     # PRs as they'll be run by the push to the branch.
