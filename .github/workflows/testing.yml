@@ -14,8 +14,10 @@ jobs:
       image: ubuntu:20.04
 
     steps:
-      - name: Install packpack
+      - name: Checkout
         uses: actions/checkout@v2
+
+      - name: Install packpack
         run: |
           mkdir ~/tools && cd ~/tools
           git clone https://github.com/packpack/packpack
