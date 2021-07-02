@@ -25,7 +25,6 @@ jobs:
           grep 'OS=\|DIST=' .travis.yml
 
       - name: Pack
-        uses: actions/checkout@v1
         run: |
           OS=ubuntu DIST=bionic ~/tools/packpack/packpack
           cd build
