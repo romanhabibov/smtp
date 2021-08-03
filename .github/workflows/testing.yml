@@ -207,7 +207,7 @@ jobs:
         if: ${{ matrix.os == 'centos:7' || matrix.os == 'fedora:31' }}
         run: |
           NAME=$(ls | grep "\.rpm$")
-          dpkg -i $NAME
+          rpm -i $NAME
 
       - name: Install deb package
         if: ${{ matrix.os == 'ubuntu:bionic' || matrix.os == 'debian:buster' }}
