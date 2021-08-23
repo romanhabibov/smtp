@@ -1,0 +1,91 @@
+name: testing_tarantoolctl
+
+on: [push, pull_request]
+
+jobs:
+  test_tarantoolctl:
+    strategy:
+      fail-fast: false
+      matrix:
+        # os: ["centos:7", "fedora:31", "ubuntu:bionic", "debian:buster"]
+        tarantool:
+          - release/1.10.10
+          - live/2.9
+    env:
+      # Set as absolute paths to avoid any possible confusion
+      # after changing a current directory.
+      SMTP_SRCDIR: ${{ format('{0}/smtp', github.workspace) }}
+      PACKPACK_SRCDIR: ${{ format('{0}/smtp/packpack', github.workspace) }}
+
+      - name: Checkout to packpack
+        uses: actions/checkout@v2
+        with:
+          repository: tarantool/tarantool
+          path: ${{ env.TARANTOOL_SRCDIR }}
+
+      # Prevent packages like tzdata from asking configuration
+      # parameters interactively.
+      # See https://github.com/packpack/packpack/issues/7
+      DEBIAN_FRONTEND: noninteractive
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Export auxilary environment variables
+        run: |
+          # Split ${{ matrix.tarantool }}.
+          T="${{ matrix.tarantool }}"
+          T_KIND="${T%%/*}"
+          T_VERSION="${T##*/}"
+          if [ "${T_KIND}" = release ]; then
+              T_SERIES="${T_VERSION%.*}"
+          else
+              T_SERIES="${T_VERSION}"
+          fi
+
+          ARTIFACT_NAME="$(echo "${{ matrix.os }}" | tr -d ':')"
+
+          # Make the variables available for the next steps.
+          printf '%s=%s\n' T_KIND    "${T_KIND}"    >> "${GITHUB_ENV}"
+          printf '%s=%s\n' T_VERSION "${T_VERSION}" >> "${GITHUB_ENV}"
+          printf '%s=%s\n' T_SERIES  "${T_SERIES}"  >> "${GITHUB_ENV}"
+          printf '%s=%s\n' ARTIFACT_NAME  "${ARTIFACT_NAME}"  >> "${GITHUB_ENV}"
+
+      # - name: Install curl on Centos, Fedora
+      #   if: startsWith(matrix.os, 'centos:') || startsWith(matrix.os, 'fedora:')
+      #   run: |
+      #     yum update && yum upgrade -y
+      #     yum install curl -y
+
+      - name: Install curl on Ubuntu, Debian
+        # if: startsWith(matrix.os, 'debian:') || startsWith(matrix.os, 'ubuntu:')
+        run: |
+          apt-get update -y && apt-get upgrade -y
+          apt-get install curl -y
+
+      - name: Setup tarantool ${{ env.T_SERIES }} repository
+        run: |
+          URL="https://tarantool.io/${T_KIND}/${T_SERIES}/installer.sh"
+          curl -fsSL "${URL}" > installer.sh
+          chmod a+x installer.sh
+          ./installer.sh
+
+      # - name: Install tarantool ${{ matrix.tarantool }} on Centos, Fedora
+      #   if: startsWith(matrix.os, 'centos:') || startsWith(matrix.os, 'fedora:')
+      #   run: |
+      #     yum install -y tarantool
+
+      - name: Install tarantool ${{ matrix.tarantool }} on Ubuntu, Debian
+        # if: startsWith(matrix.os, 'debian:') || startsWith(matrix.os, 'ubuntu:')
+        run: |
+          apt-get install -y "tarantool=${T_VERSION}*" "tarantool-dev=${T_VERSION}*"
+
+      - name: Install smtp
+        run: |
+          tarantoolctl rocks install smtp
+
+      - name: Checkout smtp
+        uses: actions/checkout@v2
+
+      - name: Run test
+        run: |
+          tarantool test/smtp.test.lua
